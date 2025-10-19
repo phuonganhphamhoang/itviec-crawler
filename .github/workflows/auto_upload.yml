@@ -1,0 +1,59 @@
+name: Crawl and Upload JSON to Azure
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"  # chạy mỗi Chủ Nhật 0h (UTC)
+  workflow_dispatch:     # cho phép chạy thủ công trên GitHub
+
+jobs:
+  crawl_and_upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 azure-storage-blob
+
+      - name: Run crawler
+        env:
+          ITVIEC_COOKIE: ${{ secrets.ITVIEC_COOKIE }}
+        run: python crawler.py
+
+      - name: Upload JSON to Azure Blob Storage
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+        run: |
+          python <<EOF
+          import os
+          from azure.storage.blob import BlobServiceClient
+          
+          account = os.environ['AZURE_STORAGE_ACCOUNT']
+          key = os.environ['AZURE_STORAGE_KEY']
+          blob_service = BlobServiceClient(
+              f"https://{account}.blob.core.windows.net/",
+              credential=key
+          )
+
+          container_name = "jobs"
+          file_path = "data.json"
+          
+          # Tạo container nếu chưa có
+          try:
+              blob_service.create_container(container_name)
+          except Exception:
+              pass
+
+          # Upload file JSON
+          blob_client = blob_service.get_blob_client(container_name, "data.json")
+          with open(file_path, "rb") as f:
+              blob_client.upload_blob(f, overwrite=True)
+          print("✅ Uploaded data.json to Azure successfully.")
+          EOF
