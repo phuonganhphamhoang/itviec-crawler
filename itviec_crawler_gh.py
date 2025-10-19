@@ -1,72 +1,65 @@
-import requests
-from bs4 import BeautifulSoup
-import json
-from datetime import datetime
 import os
+import json
 import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 
-# Lấy cookie từ GitHub Secret
-COOKIE = os.environ.get("ITVIEC_COOKIE")
+def main():
+    cookie_value = os.environ.get("ITVIEC_COOKIE")
+    if not cookie_value:
+        raise ValueError("❌ Thiếu biến môi trường ITVIEC_COOKIE (cookie đăng nhập)")
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36",
-    "Cookie": f"_ITViec_session={COOKIE}"
-}
+    # Cấu hình Chrome chạy headless (ẩn)
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
 
-BASE_URL = "https://itviec.com/it-jobs"
-DATA_FILE = "jobs.json"
+    # Khởi tạo trình duyệt
+    driver = webdriver.Chrome(options=options)
 
-def crawl_jobs():
-    print("🔍 Đang bắt đầu cào dữ liệu ITviec...")
+    print("🔹 Mở trang ITviec...")
+    driver.get("https://itviec.com")
+    time.sleep(2)
 
-    all_jobs = []
-    page = 55
-    seen_old = False
+    # Thêm cookie login
+    driver.add_cookie({
+        "name": "_ITViec_session",
+        "value": cookie_value,
+        "domain": "itviec.com"
+    })
 
-    while not seen_old:
-        url = f"{BASE_URL}?page={page}"
-        print(f"➡️  Đang cào trang {page}...")
+    # Tải lại trang sau khi thêm cookie
+    driver.get("https://itviec.com/it-jobs")
+    time.sleep(3)
 
-        res = requests.get(url, headers=headers)
-        if res.status_code != 200:
-            print(f"❌ Lỗi khi tải trang {page}: {res.status_code}")
-            break
+    print("🔹 Bắt đầu cào dữ liệu...")
+    jobs = []
 
-        soup = BeautifulSoup(res.text, "html.parser")
-        job_cards = soup.select("div.job")
-        if not job_cards:
-            print("✅ Hết trang hoặc không có dữ liệu.")
-            break
+    job_elements = driver.find_elements(By.CSS_SELECTOR, "div.job")
+    for job in job_elements[:10]:  # cào thử 10 job đầu
+        try:
+            title = job.find_element(By.CSS_SELECTOR, "h2 a").text.strip()
+            link = job.find_element(By.CSS_SELECTOR, "h2 a").get_attribute("href")
+            salary = job.find_element(By.CSS_SELECTOR, ".salary").text.strip() if job.find_elements(By.CSS_SELECTOR, ".salary") else "N/A"
+            jobs.append({
+                "title": title,
+                "link": link,
+                "salary": salary
+            })
+        except Exception:
+            pass
 
-        for job in job_cards:
-            title = job.select_one("h3.title a")
-            company = job.select_one("div.company-name a")
-            salary = job.select_one("span.salary")
-            date = job.select_one("span.date")
+    driver.quit()
 
-            job_data = {
-                "title": title.text.strip() if title else None,
-                "link": "https://itviec.com" + title["href"] if title else None,
-                "company": company.text.strip() if company else None,
-                "salary": salary.text.strip() if salary else None,
-                "date": date.text.strip() if date else None
-            }
+    # Lưu ra file JSON
+    output_file = "jobs_data_with_salary.json"
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(jobs, f, ensure_ascii=False, indent=2)
 
-            # Kiểm tra job cũ để dừng
-            if job_data["date"] and ("day" not in job_data["date"].lower() and "hôm nay" not in job_data["date"].lower()):
-                seen_old = True
-                print("🛑 Gặp job cũ, dừng cào.")
-                break
-
-            all_jobs.append(job_data)
-
-        page += 1
-        time.sleep(1)
-
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(all_jobs, f, ensure_ascii=False, indent=2)
-
-    print(f"💾 Đã lưu {len(all_jobs)} job vào {DATA_FILE}")
+    print(f"✅ Hoàn tất! Đã lưu {len(jobs)} job vào {output_file}")
 
 if __name__ == "__main__":
-    crawl_jobs()
+    main()
