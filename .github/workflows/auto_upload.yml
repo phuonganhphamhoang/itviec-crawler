@@ -24,7 +24,7 @@ jobs:
       - name: Run crawler
         env:
           ITVIEC_COOKIE: ${{ secrets.ITVIEC_COOKIE }}
-        run: python crawler.py
+        run: python itviec_crawler_gh.py
 
       - name: Upload JSON to Azure Blob Storage
         env:
