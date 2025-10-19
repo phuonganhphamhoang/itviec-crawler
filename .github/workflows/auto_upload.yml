@@ -28,9 +28,14 @@ jobs:
           ITVIEC_COOKIE: ${{ secrets.ITVIEC_COOKIE }}
         run: python itviec_crawler_gh.py
 
-      - name: Upload to Azure Storage
-        uses: bacongobbler/azure-blob-storage-upload@v1.4.1
+      - name: Upload to Azure Blob
+        uses: azure/cli@v2
         with:
-          source_dir: .
-          container_name: '$web'
-          connection_string: DefaultEndpointsProtocol=https;AccountName=${{ secrets.AZURE_STORAGE_ACCOUNT }};AccountKey=${{ secrets.AZURE_STORAGE_KEY }};EndpointSuffix=core.windows.net
+          inlineScript: |
+            az storage blob upload \
+              --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
+              --account-key ${{ secrets.AZURE_STORAGE_KEY }} \
+              --container-name '$web' \
+              --file jobs_data_with_salary.json \
+              --name jobs_data_with_salary.json \
+              --overwrite true
