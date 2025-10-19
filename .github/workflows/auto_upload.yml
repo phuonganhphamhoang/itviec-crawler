@@ -1,59 +1,36 @@
-name: Crawl and Upload JSON to Azure
+name: Crawl ITviec Weekly
 
 on:
   schedule:
-    - cron: "0 0 * * 0"  # chạy mỗi Chủ Nhật 0h (UTC)
-  workflow_dispatch:     # cho phép chạy thủ công trên GitHub
+    - cron: "0 0 * * 0"  # Chạy mỗi Chủ nhật 0h UTC
+  workflow_dispatch:      # Cho phép bấm "Run workflow" thủ công
 
 jobs:
-  crawl_and_upload:
+  crawl:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4 azure-storage-blob
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium webdriver-manager
 
       - name: Run crawler
         env:
           ITVIEC_COOKIE: ${{ secrets.ITVIEC_COOKIE }}
         run: python itviec_crawler_gh.py
 
-      - name: Upload JSON to Azure Blob Storage
-        env:
-          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
-          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
-        run: |
-          python <<EOF
-          import os
-          from azure.storage.blob import BlobServiceClient
-          
-          account = os.environ['AZURE_STORAGE_ACCOUNT']
-          key = os.environ['AZURE_STORAGE_KEY']
-          blob_service = BlobServiceClient(
-              f"https://{account}.blob.core.windows.net/",
-              credential=key
-          )
-
-          container_name = "jobs"
-          file_path = "data.json"
-          
-          # Tạo container nếu chưa có
-          try:
-              blob_service.create_container(container_name)
-          except Exception:
-              pass
-
-          # Upload file JSON
-          blob_client = blob_service.get_blob_client(container_name, "data.json")
-          with open(file_path, "rb") as f:
-              blob_client.upload_blob(f, overwrite=True)
-          print("✅ Uploaded data.json to Azure successfully.")
-          EOF
+      - name: Upload to Azure Storage
+        uses: bacongobbler/azure-blob-storage-upload@v1.4.1
+        with:
+          source_dir: .
+          container_name: '$web'
+          connection_string: DefaultEndpointsProtocol=https;AccountName=${{ secrets.AZURE_STORAGE_ACCOUNT }};AccountKey=${{ secrets.AZURE_STORAGE_KEY }};EndpointSuffix=core.windows.net
