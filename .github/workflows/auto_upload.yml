@@ -3,39 +3,61 @@ name: Crawl ITviec Weekly
 on:
   schedule:
     - cron: "0 0 * * 0"  # Chạy mỗi Chủ nhật 0h UTC
-  workflow_dispatch:      # Cho phép bấm "Run workflow" thủ công
+  workflow_dispatch:
 
 jobs:
-  crawl:
+  crawl_and_upload:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install selenium webdriver-manager undetected-chromedriver requests beautifulsoup4
+          pip install selenium webdriver-manager requests beautifulsoup4
+
+      - name: Install Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip xvfb libxi6 libgconf-2-4
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
 
       - name: Run crawler
         env:
           ITVIEC_COOKIE: ${{ secrets.ITVIEC_COOKIE }}
-        run: python itviec_crawler_with_login.py
+        run: |
+          xvfb-run -a python itviec_crawler_gh.py
 
-      - name: Upload to Azure Blob
-        uses: azure/cli@v2
-        with:
-          inlineScript: |
-            az storage blob upload \
-              --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
-              --account-key ${{ secrets.AZURE_STORAGE_KEY }} \
-              --container-name '$web' \
-              --file jobs_data_with_salary.json \
-              --name jobs_data_with_salary.json \
-              --overwrite true
+      - name: Upload JSON to Azure Blob
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+        run: |
+          python <<EOF
+          import os
+          from azure.storage.blob import BlobServiceClient
+          account = os.environ['AZURE_STORAGE_ACCOUNT']
+          key = os.environ['AZURE_STORAGE_KEY']
+          blob_service = BlobServiceClient(
+              f"https://{account}.blob.core.windows.net/",
+              credential=key
+          )
+          container_name = "jobs"
+          file_path = "jobs_data_with_salary.json"
+          try:
+              blob_service.create_container(container_name)
+          except Exception:
+              pass
+          blob_client = blob_service.get_blob_client(container_name, "jobs_data_with_salary.json")
+          with open(file_path, "rb") as f:
+              blob_client.upload_blob(f, overwrite=True)
+          print("✅ Uploaded jobs_data_with_salary.json to Azure successfully.")
+          EOF
