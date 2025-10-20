@@ -25,7 +25,7 @@ jobs:
         env:
           ITVIEC_COOKIE: ${{ secrets.ITVIEC_COOKIE }}
         run: |
-          python itviec_crawler_with_login.py
+          python itviec_crawler_cloud.py
 
       - name: Upload JSON to GitHub Artifact
         uses: actions/upload-artifact@v4
