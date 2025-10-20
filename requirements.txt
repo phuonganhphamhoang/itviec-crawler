@@ -1,3 +1,6 @@
 undetected-chromedriver
 selenium
 webdriver-manager
+certifi
+python-dotenv
+azure-storage-blob
