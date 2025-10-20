@@ -1,61 +1,21 @@
-name: Crawl ITviec
-
+name: Crawl Itviec Daily
 on:
+  schedule:
+    - cron: "0 2 * * *"  # mỗi ngày lúc 9h sáng VN (UTC+7)
   workflow_dispatch:
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
-
+          python-version: "3.13"
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install azure-storage-blob
-
+        run: pip install -r requirements.txt
       - name: Run crawler
         env:
-          ITVIEC_COOKIE: ${{ secrets.ITVIEC_COOKIE }}
-        run: |
-          python itviec_crawler_cloud.py
-
-      - name: Upload JSON to GitHub Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: jobs_data
-          path: jobs_data_with_salary.json
-
-      - name: Upload JSON to Azure Blob Storage
-        env:
           AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
-        run: |
-          python - <<'EOF'
-          from azure.storage.blob import BlobServiceClient
-          import os
-
-          conn_str = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
-          blob_service_client = BlobServiceClient.from_connection_string(conn_str)
-
-          container_name = "itviec-data"
-          file_path = "jobs_data_with_salary.json"
-          blob_name = "jobs_data_with_salary.json"
-
-          container_client = blob_service_client.get_container_client(container_name)
-          try:
-              container_client.create_container()
-          except Exception:
-              pass
-
-          with open(file_path, "rb") as data:
-              container_client.upload_blob(name=blob_name, data=data, overwrite=True)
-
-          print(f"✅ Uploaded {file_path} to Azure Blob container '{container_name}'")
-          EOF
+        run: python itviec_crawler_cloud.py
