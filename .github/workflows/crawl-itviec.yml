@@ -1,0 +1,23 @@
+name: Crawl ITviec
+on:
+  workflow_dispatch:
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    env:
+      ITVIEC_COOKIE: ${{ secrets.ITVIEC_COOKIE }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+      - name: Install dependencies
+        run: pip install -U undetected-chromedriver selenium webdriver-manager
+      - name: Run crawler
+        run: xvfb-run -a python itviec_crawler_cloud.py
+      - name: Upload JSON
+        uses: actions/upload-artifact@v3
+        with:
+          name: jobs_data
+          path: jobs_data_with_salary.json
