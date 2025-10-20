@@ -17,7 +17,7 @@ jobs:
       - name: Run crawler
         run: xvfb-run -a python itviec_crawler_cloud.py
       - name: Upload JSON
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jobs_data
           path: jobs_data_with_salary.json
