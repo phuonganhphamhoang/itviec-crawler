@@ -3,3 +3,5 @@ selenium
 webdriver-manager
 azure-storage-blob
 certifi
+setuptools>=68.0.0
+wheel
