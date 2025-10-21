@@ -1,6 +1,5 @@
-undetected-chromedriver
 selenium
-webdriver-manager
+undetected-chromedriver
 azure-storage-blob
 certifi
-setuptools
+setuptools>=68.0.0
