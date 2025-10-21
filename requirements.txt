@@ -1,5 +1,4 @@
-selenium
-undetected-chromedriver==3.5.5
+playwright
 azure-storage-blob
 certifi
 setuptools>=68.0.0
