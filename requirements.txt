@@ -1,5 +1,6 @@
 selenium
-undetected-chromedriver
+undetected-chromedriver==3.5.5
 azure-storage-blob
 certifi
 setuptools>=68.0.0
+wheel

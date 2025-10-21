@@ -1,4 +1,5 @@
 import os
+import setuptools  # ✅ Bắt buộc fix cho Python 3.12 thiếu distutils
 import time
 import random
 import json
@@ -6,32 +7,35 @@ import re
 from pathlib import Path
 from datetime import datetime, timedelta
 
-import undetected_chromedriver as uc
+import certifi
+import ssl
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import certifi
-import ssl
-
 from azure.storage.blob import BlobServiceClient
-from datetime import datetime
-import os
 
+# SSL fix để đảm bảo certifi dùng đúng CA
 ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
 
 # ---------------- CONFIG ----------------
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/140.0.0.0 Safari/537.36"
+)
 SELECTOR_SALARY = "div.salary span"
 WAIT_TIMEOUT = 20
 DEFAULT_PAGES = 3  # số trang muốn crawl
 OUT_PATH = Path("jobs_data_public.json")
 
+
 # ---------------- Helper: start undetected driver ----------------
 def init_uc_driver(headless=True):
+    import undetected_chromedriver as uc  # ✅ import sau khi setuptools đã load
     options = uc.ChromeOptions()
-    if headless:
-        options.add_argument("--headless=new")  # chỉ thêm nếu cần headless
 
+    if headless:
+        options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -64,6 +68,7 @@ def parse_posted_time(text):
     if "yesterday" in text:
         return (now - timedelta(days=1)).strftime("%Y-%m-%d")
     return ""
+
 
 # ---------------- Get job list ----------------
 def get_job_list(driver, wait, pages=DEFAULT_PAGES):
@@ -101,13 +106,13 @@ def get_job_list(driver, wait, pages=DEFAULT_PAGES):
 
     return list(all_job_urls)
 
+
 # ---------------- Crawl job detail ----------------
 def crawl_job(driver, wait, url):
     job = {"url": url}
     try:
         driver.get(url)
         time.sleep(random.uniform(1.5, 2.5))
-
         job["job_name"] = driver.find_element(By.CSS_SELECTOR, "h1.ipt-xl-6.text-it-black").text.strip()
     except Exception:
         job["job_name"] = ""
@@ -147,6 +152,20 @@ def crawl_job(driver, wait, url):
 
     return job
 
+
+# ---------------- Upload ----------------
+def upload_to_blob(file_path, container_name="itviec-data"):
+    conn_str = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
+    blob_service = BlobServiceClient.from_connection_string(conn_str)
+    blob_name = f"jobs_{datetime.now():%Y%m%d_%H%M%S}.json"
+    blob_client = blob_service.get_blob_client(container=container_name, blob=blob_name)
+
+    with open(file_path, "rb") as data:
+        blob_client.upload_blob(data, overwrite=True)
+
+    print(f"✅ Uploaded {file_path} → Azure Blob ({container_name})")
+
+
 # ---------------- Main ----------------
 def main():
     print("=== itviec crawler (public, no login) ===")
@@ -172,14 +191,6 @@ def main():
         upload_to_blob(OUT_PATH)
     finally:
         driver.quit()
-
-def upload_to_blob(file_path, container_name="itviec-data"):
-    conn_str = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
-    blob_service = BlobServiceClient.from_connection_string(conn_str)
-    blob_client = blob_service.get_blob_client(container=container_name, blob=f"jobs_{datetime.now():%Y%m%d_%H%M%S}.json")
-    with open(file_path, "rb") as data:
-        blob_client.upload_blob(data, overwrite=True)
-    print(f"✅ Uploaded {file_path} → Azure Blob ({container_name})")
 
 
 if __name__ == "__main__":
