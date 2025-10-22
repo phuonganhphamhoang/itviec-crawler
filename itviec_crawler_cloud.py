@@ -30,12 +30,23 @@ async def parse_posted_time(text):
 
 # ---------------- Crawl ----------------
 async def crawl_itviec():
-    print("=== itviec crawler (Playwright, fixed selector) ===")
+    print("=== itviec crawler (Playwright, Azure-optimized) ===")
     jobs = []
     pattern_valid = re.compile(r"https?://itviec\.com/it-jobs/[^/?#]+-\d+$", re.IGNORECASE)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--disable-software-rasterizer",
+                "--disable-setuid-sandbox",
+                "--disable-web-security",
+                "--disable-features=IsolateOrigins,site-per-process",
+            ],
+        )
         page = await browser.new_page()
         await page.set_viewport_size({"width": 1920, "height": 1080})
 
@@ -44,36 +55,31 @@ async def crawl_itviec():
         for page_num in range(1, DEFAULT_PAGES + 1):
             url = f"https://itviec.com/it-jobs?page={page_num}"
             print(f"Mở trang: {url}")
-            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            await page.wait_for_load_state("domcontentloaded")
-            await page.wait_for_timeout(3000)
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                await page.wait_for_load_state("domcontentloaded")
+                await page.wait_for_timeout(3000)
+            except Exception as e:
+                print(f"⚠️ Lỗi load trang {url}: {e}")
+                continue
 
-            elems = await page.query_selector_all("[data-search--job-selection-job-slug-value]")
-            for el in elems:
-                slug = await el.get_attribute("data-search--job-selection-job-slug-value")
-                if slug:
-                    link = f"https://itviec.com/it-jobs/{slug}".split("?")[0]
+            anchors = await page.query_selector_all("a[href*='/it-jobs/']")
+            for a in anchors:
+                href = await a.get_attribute("href")
+                if href:
+                    link = href.split("?")[0].split("#")[0]
                     if pattern_valid.match(link):
                         all_job_links.add(link)
 
-            # fallback nếu chưa đủ link
-            if not elems:
-                anchors = await page.query_selector_all("a[href*='/it-jobs/']")
-                for a in anchors:
-                    href = await a.get_attribute("href")
-                    if href:
-                        link = href.split("?")[0].split("#")[0]
-                        if pattern_valid.match(link):
-                            all_job_links.add(link)
-
             print(f"  -> {len(all_job_links)} link hợp lệ (tích lũy)")
-            await page.wait_for_timeout(random.uniform(1000, 2000))
+            await page.wait_for_timeout(1500)
 
         print(f"📄 Tổng {len(all_job_links)} job URLs. Bắt đầu crawl chi tiết...")
 
         for i, link in enumerate(all_job_links, start=1):
             try:
-                await page.goto(link, wait_until="networkidle")
+                await page.goto(link, wait_until="domcontentloaded", timeout=60000)
+                await page.wait_for_load_state("domcontentloaded")
                 await page.wait_for_timeout(2000)
 
                 job = {
@@ -88,21 +94,15 @@ async def crawl_itviec():
                 }
 
                 skills = await page.query_selector_all("div.d-flex.flex-wrap.igap-2 a")
-                job["skills"] = [
-                    (await s.text_content()).strip()
-                    for s in skills
-                    if await s.text_content()
-                ]
-
+                job["skills"] = [(await s.text_content()).strip() for s in skills if await s.text_content()]
                 time_elem = await page.query_selector("//span[contains(text(),'Posted')]")
                 if time_elem:
                     time_text = (await time_elem.text_content()) or ""
                     job["posted_date"] = await parse_posted_time(time_text)
 
                 jobs.append(job)
-                print(f"[{i}/{len(all_job_links)}] ✅ {job['job_name'][:40]}")
+                print(f"[{i}/{len(all_job_links)}] ✅ {job['job_name'][:50]}")
                 await page.wait_for_timeout(random.uniform(800, 1600))
-
             except Exception as e:
                 print(f"⚠️ Lỗi crawl {link}: {e}")
 
