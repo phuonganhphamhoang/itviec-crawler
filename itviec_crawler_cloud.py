@@ -52,30 +52,26 @@ async def crawl_itviec():
             print(f"🌐 Mở trang: {url}")
             try:
                 await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                await page.wait_for_load_state("domcontentloaded")
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(5000)  # 🔥 đợi JS render xong job cards
             except Exception as e:
                 print(f"⚠️ Lỗi load {url}: {e}")
                 continue
 
-            job_cards = await page.query_selector_all("[data-search--job-selection-job-slug-value]")
-            if job_cards:
-                for c in job_cards:
-                    slug = await c.get_attribute("data-search--job-selection-job-slug-value")
-                    if slug:
-                        link = f"https://itviec.com/it-jobs/{slug}".split("?")[0]
-                        all_job_links.add(link)
+            content = await page.content()
+            matches = re.findall(r'"slug":"([^"]+?)","title":"', content)
+            for slug in matches:
+                link = f"https://itviec.com/it-jobs/{slug}"
+                all_job_links.add(link)
 
-            anchors = await page.query_selector_all("a[href*='/it-jobs/']")
-            for a in anchors:
-                href = await a.get_attribute("href")
-                if href:
-                    link = href.split("?")[0].split("#")[0]
-                    if pattern_valid.match(link):
-                        all_job_links.add(link)
+            job_cards = await page.query_selector_all("[data-search--job-selection-job-slug-value]")
+            for c in job_cards:
+                slug = await c.get_attribute("data-search--job-selection-job-slug-value")
+                if slug:
+                    all_job_links.add(f"https://itviec.com/it-jobs/{slug}")
 
             print(f"  ✅ {len(all_job_links)} link hợp lệ (tích lũy)")
-            await page.wait_for_timeout(1500)
+            await page.wait_for_timeout(1000)
+
 
 
         print(f"📄 Tổng {len(all_job_links)} job URLs. Bắt đầu crawl chi tiết...")
