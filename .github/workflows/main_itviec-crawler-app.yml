@@ -36,40 +36,30 @@ jobs:
           name: python-app
           path: .
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      id-token: write
-      contents: read
+    deploy:
+      runs-on: ubuntu-latest
+      needs: build
+      env:
+        AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+      steps:
+        - uses: actions/download-artifact@v4
+          with:
+            name: python-app
 
-    env:
-      AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+        - name: Login to Azure
+          uses: azure/login@v2
+          with:
+            client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_F794FA166F194B3EB0D276427C6FF714 }}
+            tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_77727E867B754CFFAF28E5A25A90B4A6 }}
+            subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_FDF51AB1B7F040BAAD01F1967A84C90B }}
 
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: python-app
+        - name: Install dependencies
+          run: |
+            pip install -r requirements.txt
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_F794FA166F194B3EB0D276427C6FF714 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_77727E867B754CFFAF28E5A25A90B4A6 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_FDF51AB1B7F040BAAD01F1967A84C90B }}
+        - name: Deploy to Azure Web App
+          uses: azure/webapps-deploy@v3
+          with:
+            app-name: 'itviec-crawler-app'
 
-      - name: Install dependencies before deploy
-        run: |
-          pip install -r requirements.txt
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'itviec-crawler-app'
-          slot-name: 'Production'
-
-      - name: Verify environment variable
-        run: |
-          echo "✅ AZURE_STORAGE_CONNECTION_STRING is set successfully."
 

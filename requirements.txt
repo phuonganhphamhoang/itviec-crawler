@@ -1,5 +1,6 @@
 playwright
 azure-storage-blob>=12.22.0
+azure-core>=1.29.5
 certifi
 setuptools>=68.0.0
 wheel
