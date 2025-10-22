@@ -58,6 +58,14 @@ async def crawl_itviec():
                 print(f"⚠️ Lỗi load {url}: {e}")
                 continue
 
+            job_cards = await page.query_selector_all("[data-search--job-selection-job-slug-value]")
+            if job_cards:
+                for c in job_cards:
+                    slug = await c.get_attribute("data-search--job-selection-job-slug-value")
+                    if slug:
+                        link = f"https://itviec.com/it-jobs/{slug}".split("?")[0]
+                        all_job_links.add(link)
+
             anchors = await page.query_selector_all("a[href*='/it-jobs/']")
             for a in anchors:
                 href = await a.get_attribute("href")
@@ -68,6 +76,7 @@ async def crawl_itviec():
 
             print(f"  ✅ {len(all_job_links)} link hợp lệ (tích lũy)")
             await page.wait_for_timeout(1500)
+
 
         print(f"📄 Tổng {len(all_job_links)} job URLs. Bắt đầu crawl chi tiết...")
 
