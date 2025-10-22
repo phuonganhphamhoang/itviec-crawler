@@ -1,17 +1,13 @@
 import asyncio
 from playwright.async_api import async_playwright
-import json
-import re
-import random
+import json, re, random, os
 from datetime import datetime, timedelta
 from pathlib import Path
-import os
 from azure.storage.blob import BlobServiceClient
 
 OUT_PATH = Path("jobs_data_public.json")
 DEFAULT_PAGES = 3
 
-# ---------------- Helper ----------------
 async def parse_posted_time(text):
     if not text:
         return ""
@@ -23,16 +19,15 @@ async def parse_posted_time(text):
         return (now - timedelta(days=1)).strftime("%Y-%m-%d")
     m = re.search(r"(\d+)\s*(day|hour)", text)
     if m:
-        value, unit = int(m.group(1)), m.group(2)
-        delta = timedelta(days=value) if unit == "day" else timedelta(hours=value)
+        v, u = int(m.group(1)), m.group(2)
+        delta = timedelta(days=v) if u == "day" else timedelta(hours=v)
         return (now - delta).strftime("%Y-%m-%d")
     return ""
 
-# ---------------- Crawl ----------------
 async def crawl_itviec():
-    print("=== itviec crawler (Playwright, Azure-optimized) ===")
+    print("=== itviec crawler (Playwright, GitHub Runner version) ===")
     jobs = []
-    pattern_valid = re.compile(r"https?://itviec\.com/it-jobs/[^/?#]+-\d+$", re.IGNORECASE)
+    pattern_valid = re.compile(r"https?://itviec\.com/it-jobs/[^/?#]+-\d+$", re.I)
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(
@@ -54,13 +49,13 @@ async def crawl_itviec():
 
         for page_num in range(1, DEFAULT_PAGES + 1):
             url = f"https://itviec.com/it-jobs?page={page_num}"
-            print(f"Mở trang: {url}")
+            print(f"🌐 Mở trang: {url}")
             try:
                 await page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 await page.wait_for_load_state("domcontentloaded")
                 await page.wait_for_timeout(3000)
             except Exception as e:
-                print(f"⚠️ Lỗi load trang {url}: {e}")
+                print(f"⚠️ Lỗi load {url}: {e}")
                 continue
 
             anchors = await page.query_selector_all("a[href*='/it-jobs/']")
@@ -71,7 +66,7 @@ async def crawl_itviec():
                     if pattern_valid.match(link):
                         all_job_links.add(link)
 
-            print(f"  -> {len(all_job_links)} link hợp lệ (tích lũy)")
+            print(f"  ✅ {len(all_job_links)} link hợp lệ (tích lũy)")
             await page.wait_for_timeout(1500)
 
         print(f"📄 Tổng {len(all_job_links)} job URLs. Bắt đầu crawl chi tiết...")
@@ -112,20 +107,22 @@ async def crawl_itviec():
     print(f"✅ Hoàn tất crawl {len(jobs)} jobs. Lưu {OUT_PATH}")
     upload_to_blob(OUT_PATH)
 
-
 def upload_to_blob(file_path, container_name="itviec-data"):
     conn_str = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
     if not conn_str:
         raise EnvironmentError("AZURE_STORAGE_CONNECTION_STRING not set")
+
     blob_service = BlobServiceClient.from_connection_string(conn_str)
     blob_client = blob_service.get_blob_client(
         container=container_name,
         blob=f"jobs_{datetime.now():%Y%m%d_%H%M%S}.json",
     )
+
     with open(file_path, "rb") as data:
         blob_client.upload_blob(data, overwrite=True)
-    print(f"✅ Uploaded {file_path} → Azure Blob ({container_name})")
 
+    print(f"✅ Uploaded {file_path} → Azure Blob ({container_name})")
 
 if __name__ == "__main__":
     asyncio.run(crawl_itviec())
+
