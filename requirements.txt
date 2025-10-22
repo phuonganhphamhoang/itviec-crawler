@@ -1,5 +1,5 @@
 playwright
-azure-storage-blob
+azure-storage-blob>=12.22.0
 certifi
 setuptools>=68.0.0
 wheel
