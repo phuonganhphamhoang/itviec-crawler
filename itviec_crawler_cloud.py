@@ -44,7 +44,8 @@ async def crawl_itviec():
         for page_num in range(1, DEFAULT_PAGES + 1):
             url = f"https://itviec.com/it-jobs?page={page_num}"
             print(f"Mở trang: {url}")
-            await page.goto(url, wait_until="networkidle")
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            await page.wait_for_load_state("domcontentloaded")
             await page.wait_for_timeout(3000)
 
             elems = await page.query_selector_all("[data-search--job-selection-job-slug-value]")
