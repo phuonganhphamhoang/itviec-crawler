@@ -6,7 +6,7 @@ name: ITviec Crawler (GitHub Action Runner)
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # 🔁 chạy mỗi 10 phút
+    - cron: "0 23 * * 0" # ⏰ 6:00 sáng thứ Hai theo giờ VN (23:00 Chủ nhật UTC)
   workflow_dispatch:        # có thể chạy thủ công từ tab Actions
 
 jobs:
