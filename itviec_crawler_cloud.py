@@ -29,16 +29,15 @@ async def crawl_itviec():
     jobs = []
 
     async with async_playwright() as p:
+
         browser = await p.chromium.launch(
             headless=True,
             args=[
                 "--no-sandbox",
-                "--disable-gpu",
                 "--disable-dev-shm-usage",
-                "--disable-software-rasterizer",
+                "--disable-gpu",
+                "--disable-blink-features=AutomationControlled",
                 "--disable-setuid-sandbox",
-                "--disable-web-security",
-                "--disable-features=IsolateOrigins,site-per-process",
             ],
         )
         
@@ -46,6 +45,7 @@ async def crawl_itviec():
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
+        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         page = await context.new_page()
         await page.set_viewport_size({"width": 1920, "height": 1080})
 

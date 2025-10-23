@@ -26,17 +26,24 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3 libxss1 libasound2 libxrandr2
           pip install --upgrade pip
           pip install playwright azure-storage-blob
           python -m playwright install --with-deps chromium
 
       - name: Run crawler
         run: |
-          python itviec_crawler_cloud.py
+          python itviec_crawler_cloud.py || true
+          echo "====== Debug HTMLs ======"
+          ls -lh debug_page_* || true
 
       - name: Upload logs as artifact (optional)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: crawl-logs
-          path: jobs_data_public.json
+          path: |
+            jobs_data_public.json
+            debug_page_*.*
+
