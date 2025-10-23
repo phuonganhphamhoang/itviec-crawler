@@ -6,7 +6,7 @@ from pathlib import Path
 from azure.storage.blob import BlobServiceClient
 
 OUT_PATH = Path("jobs_data_public.json")
-DEFAULT_PAGES = 3
+DEFAULT_PAGES = 50
 
 async def parse_posted_time(text):
     if not text:
