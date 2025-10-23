@@ -29,15 +29,15 @@ async def crawl_itviec():
     jobs = []
 
     async with async_playwright() as p:
-
         browser = await p.chromium.launch(
             headless=True,
             args=[
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
-                "--disable-blink-features=AutomationControlled",
                 "--disable-setuid-sandbox",
+                "--disable-blink-features=AutomationControlled",
+                "--window-size=1920,1080",
             ],
         )
         
@@ -55,7 +55,7 @@ async def crawl_itviec():
             url = f"https://itviec.com/it-jobs?page={page_num}"
             print(f"\n🌐 Mở trang: {url}")
             try:
-                await page.goto(url, wait_until="networkidle", timeout=90000)
+                await page.goto(url, wait_until="domcontentloaded", timeout=90000)
                 
                 # Đợi cho job cards xuất hiện (thử nhiều selector)
                 print("⏳ Đợi job cards load...")
